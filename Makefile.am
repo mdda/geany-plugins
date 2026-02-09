@@ -139,6 +139,10 @@ if ENABLE_PROJECTORGANIZER
 SUBDIRS += projectorganizer
 endif
 
+if ENABLE_PROJECT_TREE
+SUBDIRS += project-tree
+endif
+
 if ENABLE_SCOPE
 SUBDIRS += scope
 endif
