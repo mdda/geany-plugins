@@ -1,0 +1,60 @@
+Project Tree
+============
+
+.. contents::
+
+About
+-----
+
+The Project Tree plugin provides a user-defined sidebar file tree with manual session management. It allows developers to organize project files logically by concern rather than being strictly bound by the physical filesystem structure - a feature popularized by classic IDEs like Borland C++ and early versions of Visual Studio.
+
+This plugin addresses the gap between filesystem organization and a developer's mental model.  While a project's physical layout often reflects build system requirements, a developer will typically think of files grouped by feature or cross-cutting concerns (e.g., collecting all authentication-related source, headers, and tests in one logical folder).  Moreover, listing files alphabetically makes little logical sense.  This plugin allows the 'project tree' to be defined by the user.  Of course, the existing file layout can be used as well, the 'project tree' simply allows for the logical structure to stand out.
+
+
+Installation
+------------
+
+This version of the plugin is installed with the combined geany-plugins release. Please check the README of this package and/or https://plugins.geany.org/install.html.
+
+
+Features
+--------
+
+* **Logical Organization:** Create groups and nested hierarchies to organize files by feature or priority, independent of their location on disk.
+* **Context Preservation:** Save and restore the state of open tabs, including cursor line numbers and "Read Only" status.
+* **Human-Readable Configuration:** Uses two simple, spec-compliant INI files:
+    * `.editor/project-tree-layout.ini`: Stores the logical tree structure. This is human-readable and intended to be committed to version control.
+    * `.editor/session.ini`: Stores the local session state (open files, cursor positions). Typically added to `.gitignore`, and is just to preserve state on a developer's machine.
+* **Minimal Footprint:** Unlike modern IDEs that often store megabytes of opaque state data, this plugin maintains a tiny, transparent, and portable configuration.
+* **Drag-and-Drop:** Easily reorder files and groups within the sidebar.
+
+
+Usage
+-----
+
+After successful installation, load the plugin in Geany's Plugin Manager. A new "Project Tree" tab will appear in the sidebar.
+
+* **Right-click** in the sidebar to access the context menu:
+    * **New Group...**: Create a new logical folder.
+    * **Add Current File...**: Add the active document to the tree.
+    * **Remove Highlighted Entry**: Remove a file or group from the tree.
+    * **Save Project Tree**: Explicitly save the logical layout to `.editor/project-tree-layout.ini`.
+    * **Save Session**: Explicitly save the current tab state to `.editor/session.ini`.
+* **Double-click** a file in the tree to open it and jump to the saved line number.
+* **Drag and drop** items to reorganize your project hierarchy.
+
+
+Development
+-----------
+
+You can check out the current source code from the git repository at github.com. Get the code by:
+
+``git clone https://github.com/geany/geany-plugins.git``
+
+If you want to create a patch, please respect the license of the plugin as well as intellectual property of others. Patches should be licensed under the same conditions as the plugin (GPL2+).
+
+
+License
+-------
+
+Project Tree and all its parts are distributed under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version. A copy of this license can be found in the file COPYING included with the source code of this program.
