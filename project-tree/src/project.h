@@ -23,6 +23,7 @@ typedef struct _ProjectTree
     gchar *session_file_path; // Path to the .editor/session.ini file
     GSList *root_nodes;       // List of top-level ProjectTreeNodes
     gchar *current_active_file_path; // Path of the currently active file from session
+    GSList *open_groups;      // List of paths (strings) of open groups for session restoration
     // TODO: Add other project-specific metadata if needed
 } ProjectTree;
 
@@ -41,6 +42,7 @@ void project_tree_save_session(ProjectTree *tree);
 // Node management
 ProjectTreeNode *project_tree_node_new(const gchar *name, const gchar *path, gboolean is_group);
 void project_tree_node_free(ProjectTreeNode *node);
+gchar *get_node_tree_path(ProjectTreeNode *node);
 ProjectTreeNode *project_tree_find_node_by_path(ProjectTree *tree, const gchar *path);
 ProjectTreeNode *project_tree_add_node(ProjectTree *tree, ProjectTreeNode *parent, ProjectTreeNode *new_node);
 ProjectTreeNode *project_tree_insert_node_after(ProjectTree *tree, ProjectTreeNode *after_this, ProjectTreeNode *new_node);

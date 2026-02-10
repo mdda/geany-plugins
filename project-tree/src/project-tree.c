@@ -36,7 +36,6 @@ static gchar* get_config_file_path(const gchar *project_root_path, const gchar *
 // Helper to add a file to the project tree as a child
 ProjectTreeNode *add_file_to_project(const gchar *file_path, ProjectTreeNode *parent_node)
 {
-    g_message("add_file_to_project called with file_path: %s, parent_node: %p", file_path, (void*)parent_node);
     if (!current_project_tree || !file_path) return NULL;
 
     // Deduplication removed per user request.
@@ -45,7 +44,6 @@ ProjectTreeNode *add_file_to_project(const gchar *file_path, ProjectTreeNode *pa
     ProjectTreeNode *new_file_node = project_tree_node_new(g_path_get_basename(file_path), file_path, FALSE);
     ProjectTreeNode *ret = project_tree_add_node(current_project_tree, parent_node, new_file_node);
     
-    g_message("File '%s' added to project tree as child.", file_path);
     sidebar_refresh();
     return ret;
 }
@@ -53,15 +51,19 @@ ProjectTreeNode *add_file_to_project(const gchar *file_path, ProjectTreeNode *pa
 // Helper to add a file to the project tree after a specific node
 ProjectTreeNode *insert_file_to_project_after(const gchar *file_path, ProjectTreeNode *after_node)
 {
-    g_message("insert_file_to_project_after called with file_path: %s, after_node: %p", file_path, (void*)after_node);
     if (!current_project_tree || !file_path) return NULL;
 
     ProjectTreeNode *new_file_node = project_tree_node_new(g_path_get_basename(file_path), file_path, FALSE);
     ProjectTreeNode *ret = project_tree_insert_node_after(current_project_tree, after_node, new_file_node);
     
-    g_message("File '%s' inserted after node.", file_path);
     sidebar_refresh();
     return ret;
+}
+
+static gboolean on_idle_refresh(gpointer user_data)
+{
+    sidebar_refresh();
+    return FALSE; // Run once
 }
 
 // Main plugin entry point (old API)
@@ -85,7 +87,8 @@ void plugin_init(GeanyData *data)
     if (display_sidebar)
     {
         create_sidebar();
-        sidebar_refresh();
+        // Add idle refresh to ensure expansion works after UI is ready
+        g_idle_add(on_idle_refresh, NULL);
     }
 }
 

@@ -43,7 +43,7 @@ static GtkWidget *create_context_menu(void)
     g_signal_connect(item, "activate", G_CALLBACK(on_new_group_activated), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
-    item = gtk_menu_item_new_with_label(_("Remove"));
+    item = gtk_menu_item_new_with_label(_("Remove Highlighted Entry"));
     g_signal_connect(item, "activate", G_CALLBACK(on_remove_activated), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
@@ -132,7 +132,6 @@ static gboolean on_tree_view_button_press(GtkWidget *widget, GdkEventButton *eve
 // DND Callback: Called when a drag operation begins
 static void on_tree_view_drag_begin(GtkWidget *widget, GdkDragContext *context, gpointer user_data)
 {
-    g_message("on_tree_view_drag_begin");
     GtkTreeSelection *selection;
     GtkTreeModel *model;
     GtkTreeIter iter;
@@ -144,7 +143,6 @@ static void on_tree_view_drag_begin(GtkWidget *widget, GdkDragContext *context, 
         gtk_tree_model_get(model, &iter, PROJECT_TREE_COLUMN_NODE_PTR, &node_to_drag, -1);
         if (node_to_drag)
         {
-            g_message("  Dragging node: %p (%s)", (void*)node_to_drag, node_to_drag->name);
             g_object_set_data(G_OBJECT(context), "dragged-node", node_to_drag);
         }
     }
@@ -154,15 +152,12 @@ static void on_tree_view_drag_begin(GtkWidget *widget, GdkDragContext *context, 
 static void on_tree_view_drag_data_get(GtkWidget *widget, GdkDragContext *context,
                                         GtkSelectionData *selection_data, guint info, guint time, gpointer user_data)
 {
-    g_message("on_tree_view_drag_data_get (info=%d)", info);
-    
     // We only support info 0 (PROJECT_TREE_NODE_PTR) now
     if (info == 0)
     {
         ProjectTreeNode *node_to_drag = g_object_get_data(G_OBJECT(context), "dragged-node");
         if (node_to_drag)
         {
-            g_message("  Sending node pointer: %p", (void*)node_to_drag);
             gtk_selection_data_set(selection_data, gdk_atom_intern("PROJECT_TREE_NODE_PTR", FALSE),
                                    8, (guchar *)&node_to_drag, sizeof(ProjectTreeNode *));
         }
@@ -173,8 +168,6 @@ static void on_tree_view_drag_data_get(GtkWidget *widget, GdkDragContext *contex
 static void on_tree_view_drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y,
                                              GtkSelectionData *selection_data, guint info, guint time, gpointer user_data)
 {
-    g_message("on_tree_view_drag_data_received (info=%d)", info);
-    
     // We expect info 0
     if (info != 0)
     {
@@ -205,8 +198,6 @@ static void on_tree_view_drag_data_received(GtkWidget *widget, GdkDragContext *c
         dragged_node = g_object_get_data(G_OBJECT(context), "dragged-node");
     }
     
-    g_message("  Received node pointer: %p", (void*)dragged_node);
-
     if (!dragged_node)
     {
         if (dest_path) gtk_tree_path_free(dest_path);
@@ -268,12 +259,10 @@ static void on_tree_view_drag_data_received(GtkWidget *widget, GdkDragContext *c
     
     if (current_project_tree)
     {
-        g_message("  Unlinking node from old position...");
         project_tree_unlink_node(current_project_tree, dragged_node);
 
         if (new_parent)
         {
-            g_message("  Inserting node into new parent '%s'...", new_parent->name);
             if (new_position == -1 || new_position >= g_slist_length(new_parent->children))
                 new_parent->children = g_slist_append(new_parent->children, dragged_node);
             else
@@ -282,7 +271,6 @@ static void on_tree_view_drag_data_received(GtkWidget *widget, GdkDragContext *c
         }
         else
         {
-            g_message("  Inserting node into root...");
             if (new_position == -1 || new_position >= g_slist_length(current_project_tree->root_nodes))
                 current_project_tree->root_nodes = g_slist_append(current_project_tree->root_nodes, dragged_node);
             else
@@ -290,7 +278,6 @@ static void on_tree_view_drag_data_received(GtkWidget *widget, GdkDragContext *c
             dragged_node->parent = NULL;
         }
         
-        g_message("  Saving and refreshing...");
         project_tree_save(current_project_tree);
         sidebar_refresh();
     }
@@ -301,10 +288,12 @@ static void on_tree_view_drag_data_received(GtkWidget *widget, GdkDragContext *c
 static void prepare_project_tree_view(void)
 {
     GtkCellRenderer *text_renderer;
+    GtkCellRenderer *icon_renderer;
     GtkTreeViewColumn *column;
 
     project_tree_store = gtk_tree_store_new(PROJECT_TREE_N_COLUMNS,
                                             G_TYPE_STRING,    // Name
+                                            G_TYPE_STRING,    // Icon
                                             G_TYPE_STRING,    // Path
                                             G_TYPE_BOOLEAN,   // Is Group
                                             G_TYPE_INT,       // Line Number
@@ -313,11 +302,21 @@ static void prepare_project_tree_view(void)
 
     gtk_tree_view_set_model(GTK_TREE_VIEW(project_tree_view), GTK_TREE_MODEL(project_tree_store));
 
+    column = gtk_tree_view_column_new();
+    gtk_tree_view_column_set_title(column, _("Project Tree"));
+
+    icon_renderer = gtk_cell_renderer_pixbuf_new();
+    gtk_tree_view_column_pack_start(column, icon_renderer, FALSE);
+    gtk_tree_view_column_set_attributes(column, icon_renderer,
+                                        "icon-name", PROJECT_TREE_COLUMN_ICON,
+                                        NULL);
+
     text_renderer = gtk_cell_renderer_text_new();
-    column = gtk_tree_view_column_new_with_attributes(_("Project Tree"),
-                                                      text_renderer,
-                                                      "text", PROJECT_TREE_COLUMN_NAME,
-                                                      NULL);
+    gtk_tree_view_column_pack_start(column, text_renderer, TRUE);
+    gtk_tree_view_column_set_attributes(column, text_renderer,
+                                        "text", PROJECT_TREE_COLUMN_NAME,
+                                        NULL);
+
     gtk_tree_view_append_column(GTK_TREE_VIEW(project_tree_view), column);
 
     gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(project_tree_view), FALSE);
@@ -343,10 +342,13 @@ static void prepare_project_tree_view(void)
 static void add_nodes_to_tree_store(GtkTreeStore *store, ProjectTreeNode *node, GtkTreeIter *parent_iter)
 {
     GtkTreeIter iter;
+    GSList *l;
+    const gchar *icon_name = node->is_group ? "folder" : "text-x-generic";
 
     gtk_tree_store_append(store, &iter, parent_iter);
     gtk_tree_store_set(store, &iter,
                        PROJECT_TREE_COLUMN_NAME, node->name,
+                       PROJECT_TREE_COLUMN_ICON, icon_name,
                        PROJECT_TREE_COLUMN_PATH, node->path,
                        PROJECT_TREE_COLUMN_IS_GROUP, node->is_group,
                        PROJECT_TREE_COLUMN_LINE, node->line_number,
@@ -354,11 +356,60 @@ static void add_nodes_to_tree_store(GtkTreeStore *store, ProjectTreeNode *node, 
                        PROJECT_TREE_COLUMN_NODE_PTR, node,
                        -1);
 
-    GSList *l;
     for (l = node->children; l != NULL; l = g_slist_next(l))
     {
         ProjectTreeNode *child_node = (ProjectTreeNode *)l->data;
         add_nodes_to_tree_store(store, child_node, &iter);
+    }
+}
+
+// Helper to recursively restore expansion state
+static void restore_expansion_state_recursive(GtkTreeModel *model, GtkTreeIter *parent_iter)
+{
+    GtkTreeIter iter;
+    gboolean valid;
+
+    valid = gtk_tree_model_iter_children(model, &iter, parent_iter);
+    while (valid)
+    {
+        ProjectTreeNode *node = NULL;
+        gtk_tree_model_get(model, &iter, PROJECT_TREE_COLUMN_NODE_PTR, &node, -1);
+
+        if (node && node->is_group && current_project_tree && current_project_tree->open_groups)
+        {
+            gchar *full_path = get_node_tree_path(node);
+            GSList *l_open;
+            gboolean should_expand = FALSE;
+
+            for (l_open = current_project_tree->open_groups; l_open != NULL; l_open = g_slist_next(l_open))
+            {
+                if (strcmp((gchar *)l_open->data, full_path) == 0)
+                {
+                    should_expand = TRUE;
+                    break;
+                }
+            }
+            g_free(full_path);
+
+            if (should_expand)
+            {
+                GtkTreePath *path = gtk_tree_model_get_path(model, &iter);
+                gtk_tree_view_expand_row(GTK_TREE_VIEW(project_tree_view), path, FALSE);
+                gtk_tree_path_free(path);
+                
+                // Recurse ONLY if expanded (though here we want to recurse anyway to check children)
+            }
+        }
+
+        // Always recurse to check children, because even if this node isn't in open_groups, 
+        // it might be expanded manually or implicitly? 
+        // Actually, if we just expanded it, we should check its children.
+        // If we didn't expand it, its children won't be visible, so expanding them technically doesn't hurt 
+        // but might fail or be useless. 
+        // However, standard behavior is top-down.
+        restore_expansion_state_recursive(model, &iter);
+
+        valid = gtk_tree_model_iter_next(model, &iter);
     }
 }
 
@@ -378,7 +429,9 @@ void sidebar_refresh(void)
         ProjectTreeNode *node = (ProjectTreeNode *)l->data;
         add_nodes_to_tree_store(project_tree_store, node, NULL);
     }
-    gtk_tree_view_expand_all(GTK_TREE_VIEW(project_tree_view));
+
+    // Apply expansion state top-down
+    restore_expansion_state_recursive(GTK_TREE_MODEL(project_tree_store), NULL);
 }
 
 void create_sidebar(void)
@@ -412,6 +465,42 @@ void destroy_sidebar(void)
 GtkTreeView *get_project_tree_view(void)
 {
     return GTK_TREE_VIEW(project_tree_view);
+}
+
+// Helper to recursively get expanded group paths
+static void get_expanded_paths_recursive(GtkTreeView *tree_view, GtkTreeModel *model, GtkTreeIter *iter, GSList **list)
+{
+    GtkTreeIter child_iter;
+    if (gtk_tree_model_iter_children(model, &child_iter, iter))
+    {
+        do
+        {
+            GtkTreePath *path = gtk_tree_model_get_path(model, &child_iter);
+            if (gtk_tree_view_row_expanded(tree_view, path))
+            {
+                ProjectTreeNode *node;
+                gtk_tree_model_get(model, &child_iter, PROJECT_TREE_COLUMN_NODE_PTR, &node, -1);
+                if (node && node->is_group)
+                {
+                    gchar *full_path = get_node_tree_path(node);
+                    *list = g_slist_prepend(*list, full_path);
+                    
+                    // Recurse into children
+                    get_expanded_paths_recursive(tree_view, model, &child_iter, list);
+                }
+            }
+            gtk_tree_path_free(path);
+        } while (gtk_tree_model_iter_next(model, &child_iter));
+    }
+}
+
+GSList *sidebar_get_open_groups(void)
+{
+    GSList *list = NULL;
+    if (!project_tree_view || !project_tree_store) return NULL;
+
+    get_expanded_paths_recursive(GTK_TREE_VIEW(project_tree_view), GTK_TREE_MODEL(project_tree_store), NULL, &list);
+    return list;
 }
 
 // Callback for "New Group..." menu item
@@ -587,13 +676,33 @@ static void on_save_project_tree_activated(GtkMenuItem *menuitem, gpointer user_
 }
 
 // Callback for "Save Session" menu item
+
 static void on_save_session_activated(GtkMenuItem *menuitem, gpointer user_data)
+
 {
+
     gchar *message;
+
     if (!current_project_tree) return;
 
+
+
+    // Update open groups list from UI state
+
+    g_slist_foreach(current_project_tree->open_groups, (GFunc)g_free, NULL);
+
+    g_slist_free(current_project_tree->open_groups);
+
+    current_project_tree->open_groups = sidebar_get_open_groups();
+
+
+
     project_tree_save_session(current_project_tree);
+
     message = g_strdup_printf(_("Session saved to '%s'"), current_project_tree->session_file_path);
+
     dialogs_show_msgbox(GTK_MESSAGE_INFO, message);
+
     g_free(message);
+
 }

@@ -7,6 +7,7 @@
 enum
 {
     PROJECT_TREE_COLUMN_NAME = 0, // Display name (e.g., Group name, file name)
+    PROJECT_TREE_COLUMN_ICON,     // Icon name
     PROJECT_TREE_COLUMN_PATH,     // Full path to the file (for files)
     PROJECT_TREE_COLUMN_IS_GROUP, // Boolean: TRUE if it's a group, FALSE if it's a file
     PROJECT_TREE_COLUMN_LINE,     // Line number (for session data, if applicable)
@@ -27,6 +28,9 @@ void sidebar_refresh(void);
 
 // Getter for the GtkTreeView widget
 GtkTreeView *get_project_tree_view(void);
+
+// Get list of open (expanded) groups
+GSList *sidebar_get_open_groups(void);
 
 // Prototypes for functions used in sidebar.c (Geany API functions)
 void document_goto_line(GeanyDocument *doc, gint line, gboolean center_line);

@@ -52,9 +52,23 @@ void project_tree_free(ProjectTree *tree)
     g_free(tree->project_file_path);
     g_free(tree->session_file_path);
     g_free(tree->current_active_file_path);
+    g_slist_foreach(tree->open_groups, (GFunc)g_free, NULL);
+    g_slist_free(tree->open_groups);
     g_slist_foreach(tree->root_nodes, (GFunc)project_tree_node_free, NULL);
     g_slist_free(tree->root_nodes);
     g_free(tree);
+}
+
+// Helper to get the "tree path" of a node (e.g. "./Group/SubGroup")
+gchar *get_node_tree_path(ProjectTreeNode *node)
+{
+    if (!node) return NULL;
+    if (!node->parent) return g_build_filename(".", node->name, NULL);
+
+    gchar *parent_path = get_node_tree_path(node->parent);
+    gchar *full_path = g_build_filename(parent_path, node->name, NULL);
+    g_free(parent_path);
+    return full_path;
 }
 
 ProjectTreeNode *project_tree_add_node(ProjectTree *tree, ProjectTreeNode *parent, ProjectTreeNode *new_node)
@@ -266,10 +280,10 @@ static void load_session_data(ProjectTree *tree, const gchar *session_ini_path)
     }
 
     const gchar *group_name = NULL;
-    if (g_key_file_has_group(key_file, "Session"))
-        group_name = "Session";
-    else if (g_key_file_has_group(key_file, "open-files"))
+    if (g_key_file_has_group(key_file, "open-files"))
         group_name = "open-files";
+    else if (g_key_file_has_group(key_file, "Session"))
+        group_name = "Session";
 
     if (group_name)
     {
@@ -309,21 +323,27 @@ static void load_session_data(ProjectTree *tree, const gchar *session_ini_path)
                     if (doc)
                     {
                         gint line = -1;
+                        gint j;
+
                         if (num_parts > 1) line = atoi(parts[1]);
                         if (line > 0 && doc->editor && doc->editor->sci)
                         {
                             sci_goto_line(doc->editor->sci, line - 1, TRUE);
                         }
 
-                        if (num_parts > 2 && strcmp(parts[2], "readonly") == 0)
+                        // Parse extensible flags (from index 2 onwards)
+                        for (j = 2; j < num_parts; j++)
                         {
-                            g_message("  Applying readonly status to '%s'", file_path);
-                            doc->readonly = TRUE;
-                            if (doc->editor && doc->editor->sci)
+                            if (strcmp(parts[j], "readonly") == 0)
                             {
-                                scintilla_send_message(doc->editor->sci, SCI_SETREADONLY, TRUE, 0);
-                                document_set_text_changed(doc, doc->changed); /* Trigger UI refresh */
+                                doc->readonly = TRUE;
+                                if (doc->editor && doc->editor->sci)
+                                {
+                                    scintilla_send_message(doc->editor->sci, SCI_SETREADONLY, TRUE, 0);
+                                    document_set_text_changed(doc, doc->changed); /* Trigger UI refresh */
+                                }
                             }
+                            // Add future flags here
                         }
                     }
                     g_free(file_path);
@@ -359,6 +379,24 @@ static void load_session_data(ProjectTree *tree, const gchar *session_ini_path)
         }
         g_strfreev(session_keys);
     }
+
+    // Load Open Tree (Expanded Groups)
+    if (g_key_file_has_group(key_file, "open-tree"))
+    {
+        gchar **tree_keys = g_key_file_get_keys(key_file, "open-tree", NULL, &error);
+        if (tree_keys)
+        {
+            g_qsort_with_data(tree_keys, g_strv_length(tree_keys), sizeof(gchar *), (GCompareDataFunc)compare_numeric_keys, NULL);
+            for (gint i = 0; tree_keys[i]; i++)
+            {
+                gchar *val = g_key_file_get_string(key_file, "open-tree", tree_keys[i], NULL);
+                if (val)
+                    tree->open_groups = g_slist_append(tree->open_groups, val);
+            }
+            g_strfreev(tree_keys);
+        }
+    }
+
     g_key_file_free(key_file);
 }
 
@@ -379,16 +417,12 @@ static gchar *get_relative_path_for_save(const gchar *file_path, const gchar *re
     gchar *abs_file = g_canonicalize_filename(file_path, NULL);
     gchar *abs_root = g_canonicalize_filename(repo_root, NULL);
 
-    g_message("Debug RelPath: File='%s' (Canonical='%s')", file_path, abs_file);
-    g_message("Debug RelPath: Root='%s' (Canonical='%s')", repo_root, abs_root);
-
     gchar *result = NULL;
     if (g_str_has_prefix(abs_file, abs_root))
     {
         const gchar *rel = abs_file + strlen(abs_root);
         while (*rel == G_DIR_SEPARATOR) rel++;
         result = g_strdup(rel);
-        g_message("  -> Inside root. Relative: '%s'", result);
     }
     else
     {
@@ -401,19 +435,16 @@ static gchar *get_relative_path_for_save(const gchar *file_path, const gchar *re
             if (g_str_has_prefix(rel, "../../.."))
             {
                 result = g_strdup(abs_file);
-                g_message("  -> Outside root (too far). Absolute: '%s'", result);
             }
             else
             {
                 result = g_strdup(rel);
-                g_message("  -> Outside root (relative): '%s'", result);
             }
             g_free(rel);
         }
         else
         {
             result = g_strdup(abs_file);
-            g_message("  -> Outside root (no rel path). Absolute: '%s'", result);
         }
 
         g_object_unref(f_file);
@@ -513,8 +544,9 @@ void project_tree_save_session(ProjectTree *tree)
     gchar *repo_root = g_path_get_dirname(dot_editor_dir);
 
     GKeyFile *key_file = g_key_file_new();
-    gint open_file_idx = 10;
     
+    // Save Open Files
+    gint open_file_idx = 10;
     guint page_num = 0;
     GeanyDocument *doc = NULL;
     while ((doc = document_get_from_page(page_num)) != NULL)
@@ -528,16 +560,16 @@ void project_tree_save_session(ProjectTree *tree)
             if (doc->editor && doc->editor->sci)
                 line = sci_get_current_line(doc->editor->sci) + 1;
 
-            gchar *val;
+            GString *val = g_string_new(rel_path);
+            g_string_append_printf(val, ":%d", line);
+            
             if (doc->readonly)
-                val = g_strdup_printf("%s:%d:readonly", rel_path, line);
-            else
-                val = g_strdup_printf("%s:%d", rel_path, line);
+                g_string_append(val, ":readonly");
 
-            g_key_file_set_string(key_file, "Session", key, val);
+            g_key_file_set_string(key_file, "open-files", key, val->str);
             
             g_free(key);
-            g_free(val);
+            g_string_free(val, TRUE);
             g_free(rel_path);
             open_file_idx += 10;
         }
@@ -548,8 +580,22 @@ void project_tree_save_session(ProjectTree *tree)
     if (curr_doc && curr_doc->file_name)
     {
         gchar *rel_path = get_relative_path_for_save(curr_doc->file_name, repo_root);
-        g_key_file_set_string(key_file, "Session", "current_file", rel_path);
+        g_key_file_set_string(key_file, "open-files", "current_file", rel_path);
         g_free(rel_path);
+    }
+
+    // Save Open Groups (Tree State)
+    if (tree->open_groups)
+    {
+        gint group_idx = 10;
+        GSList *l;
+        for (l = tree->open_groups; l != NULL; l = g_slist_next(l))
+        {
+            gchar *key = g_strdup_printf("%d", group_idx);
+            g_key_file_set_string(key_file, "open-tree", key, (gchar *)l->data);
+            g_free(key);
+            group_idx += 10;
+        }
     }
 
     gsize data_len;
