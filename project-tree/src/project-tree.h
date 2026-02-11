@@ -25,6 +25,7 @@
 // Global plugin variables
 extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
+extern gboolean sync_editor_colors;
 
 // Keybinding enum for new actions
 enum

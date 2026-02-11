@@ -24,6 +24,7 @@
 // Global plugin variables
 GeanyPlugin *geany_plugin;
 GeanyData *geany_data;
+gboolean sync_editor_colors = TRUE;
 
 PLUGIN_VERSION_CHECK(247)
 PLUGIN_SET_TRANSLATABLE_INFO(LOCALEDIR, GETTEXT_PACKAGE,
@@ -84,6 +85,16 @@ static gboolean on_idle_refresh(gpointer user_data)
     return FALSE; // Run once
 }
 
+static void on_editor_notify(GObject *obj, GeanyEditor *editor, SCNotification *nt, gpointer user_data)
+{
+    // Refresh sidebar colors if sync is enabled
+    // We don't filter for specific notifications here to catch general style updates
+    if (sync_editor_colors)
+    {
+        sidebar_refresh();
+    }
+}
+
 // Main plugin entry point (old API)
 void plugin_init(GeanyData *data)
 {
@@ -108,6 +119,9 @@ void plugin_init(GeanyData *data)
         // Add idle refresh to ensure expansion works after UI is ready
         g_idle_add(on_idle_refresh, NULL);
     }
+
+    // Connect to editor-notify to catch color scheme changes immediately
+    plugin_signal_connect(geany_plugin, NULL, "editor-notify", TRUE, (GCallback)on_editor_notify, NULL);
 }
 
 void plugin_cleanup(void)
@@ -120,12 +134,25 @@ void plugin_cleanup(void)
     destroy_sidebar();
 }
 
+static void on_sync_colors_toggled(GtkToggleButton *button, gpointer user_data)
+{
+    sync_editor_colors = gtk_toggle_button_get_active(button);
+    sidebar_refresh();
+}
+
 GtkWidget *plugin_configure(GtkDialog *dialog)
 {
-    GtkWidget *vbox = gtk_vbox_new(FALSE, 6);
-    GtkWidget *checkbox = gtk_check_button_new_with_label(_("Display project tree sidebar"));
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkbox), display_sidebar);
-    gtk_box_pack_start(GTK_BOX(vbox), checkbox, FALSE, FALSE, 0);
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    GtkWidget *checkbox_sidebar = gtk_check_button_new_with_label(_("Display project tree sidebar"));
+    GtkWidget *checkbox_sync = gtk_check_button_new_with_label(_("Sync sidebar colors with editor scheme"));
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkbox_sidebar), display_sidebar);
+    gtk_box_pack_start(GTK_BOX(vbox), checkbox_sidebar, FALSE, FALSE, 0);
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkbox_sync), sync_editor_colors);
+    g_signal_connect(checkbox_sync, "toggled", G_CALLBACK(on_sync_colors_toggled), NULL);
+    gtk_box_pack_start(GTK_BOX(vbox), checkbox_sync, FALSE, FALSE, 0);
+
     gtk_widget_show_all(vbox);
     return vbox;
 }

@@ -22,6 +22,10 @@
 #include <gtk/gtktreeview.h> // Explicitly include for GtkTreeViewDropPosition enum values
 #include <geany/navqueue.h> // For navqueue_goto_line
 
+#include <geany/scintilla/Scintilla.h>
+#include <geany/scintilla/ScintillaWidget.h>
+#include <geany/sciwrappers.h>
+
 GtkWidget *project_tree_view;       // The GtkTreeView (removed static)
 
 static GtkWidget *project_tree_view_vbox; // Main container for the sidebar
@@ -435,6 +439,52 @@ void sidebar_refresh(void)
 {
     if (!project_tree_view_vbox || !project_tree_store)
         return;
+
+    // Apply or remove dynamic Color Sync styling
+    static GtkCssProvider *provider = NULL;
+    static gboolean provider_added = FALSE;
+    GtkStyleContext *context = gtk_widget_get_style_context(project_tree_view);
+    
+    if (sync_editor_colors)
+    {
+        GeanyDocument *doc = document_get_current();
+        if (!doc) doc = document_get_from_page(0); // Fallback to first tab if none active
+
+        if (doc && doc->editor && doc->editor->sci)
+        {
+            // Scintilla colors are 0xBBGGRR
+            long bg = scintilla_send_message(doc->editor->sci, SCI_STYLEGETBACK, STYLE_DEFAULT, 0);
+            long fg = scintilla_send_message(doc->editor->sci, SCI_STYLEGETFORE, STYLE_DEFAULT, 0);
+            
+            gchar *css = g_strdup_printf(
+                "#project_tree_view { background-color: #%02x%02x%02x; color: #%02x%02x%02x; }\n"
+                "#project_tree_view:selected { background-color: #4a90d9; color: #ffffff; }",
+                (int)(bg & 0xff), (int)((bg >> 8) & 0xff), (int)((bg >> 16) & 0xff),
+                (int)(fg & 0xff), (int)((fg >> 8) & 0xff), (int)((fg >> 16) & 0xff));
+
+            // g_message("Syncing colors: BG=#%02x%02x%02x, FG=#%02x%02x%02x", 
+            //           (int)(bg & 0xff), (int)((bg >> 8) & 0xff), (int)((bg >> 16) & 0xff),
+            //           (int)(fg & 0xff), (int)((fg >> 8) & 0xff), (int)((fg >> 16) & 0xff));
+
+            if (!provider)
+                provider = gtk_css_provider_new();
+            
+            gtk_css_provider_load_from_data(provider, css, -1, NULL);
+            g_free(css);
+
+            if (!provider_added)
+            {
+                gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
+                gtk_widget_set_name(project_tree_view, "project_tree_view");
+                provider_added = TRUE;
+            }
+        }
+    }
+    else if (provider_added)
+    {
+        gtk_style_context_remove_provider(context, GTK_STYLE_PROVIDER(provider));
+        provider_added = FALSE;
+    }
 
     gtk_tree_store_clear(project_tree_store);
 

@@ -521,6 +521,12 @@ void project_tree_save(ProjectTree *tree)
     
     if (!error)
     {
+        // Unconditionally append a newline as requested
+        gchar *new_data = g_strconcat(data, "\n", NULL);
+        g_free(data);
+        data = new_data;
+        data_len = strlen(data);
+
         if (!g_file_test(dot_editor_dir, G_FILE_TEST_IS_DIR))
         {
             gchar *confirm_msg = g_strdup_printf(_("The directory '%s' does not exist. Create it?"), dot_editor_dir);
@@ -622,6 +628,12 @@ void project_tree_save_session(ProjectTree *tree)
 
     if (!error)
     {
+        // Unconditionally append a newline as requested
+        gchar *new_data = g_strconcat(data, "\n", NULL);
+        g_free(data);
+        data = new_data;
+        data_len = strlen(data);
+
         if (!g_file_test(dot_editor_dir, G_FILE_TEST_IS_DIR))
         {
              if (g_mkdir_with_parents(dot_editor_dir, 0755) != 0)
