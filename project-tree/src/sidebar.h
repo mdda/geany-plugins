@@ -41,8 +41,17 @@ void create_sidebar(void);
 // Function to destroy the sidebar widget
 void destroy_sidebar(void);
 
-// Function to refresh/update the sidebar content
+// Capture current UI state (expansion/selection) into the project model
+void sidebar_sync_ui_state(void);
+
+// Rebuild the UI from the project model (no state capture)
 void sidebar_refresh(void);
+
+// Helper for one-step sync and refresh
+void sidebar_sync_and_refresh(void);
+
+// Update colors only
+void sidebar_update_colors(void);
 
 // Getter for the GtkTreeView widget
 GtkTreeView *get_project_tree_view(void);

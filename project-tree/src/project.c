@@ -80,10 +80,12 @@ void project_tree_free(ProjectTree *tree)
 // Helper to get the "tree path" of a node (e.g. "./Group/SubGroup")
 gchar *get_node_tree_path(ProjectTreeNode *node)
 {
-    if (!node) return NULL;
+    if (!node || !node->name) return NULL;
     if (!node->parent) return g_build_filename(".", node->name, NULL);
 
     gchar *parent_path = get_node_tree_path(node->parent);
+    if (!parent_path) return g_strdup(node->name);
+    
     gchar *full_path = g_build_filename(parent_path, node->name, NULL);
     g_free(parent_path);
     return full_path;
@@ -239,6 +241,7 @@ static void load_section_recursive(GKeyFile *key_file, ProjectTree *tree, Projec
         {
             // It's a file - resolve to absolute path
             gchar *abs_path;
+
             if (!g_path_is_absolute(value) && repo_root)
             {
                 abs_path = g_build_filename(repo_root, value, NULL);
@@ -336,32 +339,35 @@ static void load_session_data(ProjectTree *tree, const gchar *session_ini_path)
                         file_path = g_strdup(parts[0]);
                     }
 
-                    GeanyDocument *doc = document_open_file(file_path, FALSE, FALSE, NULL);
-                    
-                    if (doc)
+                    if (g_file_test(file_path, G_FILE_TEST_EXISTS))
                     {
-                        gint line = -1;
-                        gint j;
-
-                        if (num_parts > 1) line = atoi(parts[1]);
-                        if (line > 0 && doc->editor && doc->editor->sci)
+                        GeanyDocument *doc = document_open_file(file_path, FALSE, FALSE, NULL);
+                        
+                        if (doc)
                         {
-                            sci_goto_line(doc->editor->sci, line - 1, TRUE);
-                        }
+                            gint line = -1;
+                            gint j;
 
-                        // Parse extensible flags (from index 2 onwards)
-                        for (j = 2; j < num_parts; j++)
-                        {
-                            if (strcmp(parts[j], "readonly") == 0)
+                            if (num_parts > 1) line = atoi(parts[1]);
+                            if (line > 0 && doc->editor && doc->editor->sci)
                             {
-                                doc->readonly = TRUE;
-                                if (doc->editor && doc->editor->sci)
-                                {
-                                    scintilla_send_message(doc->editor->sci, SCI_SETREADONLY, TRUE, 0);
-                                    document_set_text_changed(doc, doc->changed); /* Trigger UI refresh */
-                                }
+                                sci_goto_line(doc->editor->sci, line - 1, TRUE);
                             }
-                            // Add future flags here
+
+                            // Parse extensible flags (from index 2 onwards)
+                            for (j = 2; j < num_parts; j++)
+                            {
+                                if (strcmp(parts[j], "readonly") == 0)
+                                {
+                                    doc->readonly = TRUE;
+                                    if (doc->editor && doc->editor->sci)
+                                    {
+                                        scintilla_send_message(doc->editor->sci, SCI_SETREADONLY, TRUE, 0);
+                                        document_set_text_changed(doc, doc->changed); /* Trigger UI refresh */
+                                    }
+                                }
+                                // Add future flags here
+                            }
                         }
                     }
                     g_free(file_path);

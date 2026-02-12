@@ -25,6 +25,7 @@
 #include <geany/scintilla/Scintilla.h>
 #include <geany/scintilla/ScintillaWidget.h>
 #include <geany/sciwrappers.h>
+#include <stdio.h>
 
 GtkWidget *project_tree_view;       // The GtkTreeView (removed static)
 
@@ -47,6 +48,7 @@ static void on_tree_view_drag_data_received(GtkWidget *widget, GdkDragContext *c
 
 // Forward declarations for context menu callbacks
 static void on_new_group_activated(GtkMenuItem *menuitem, gpointer user_data);
+static void on_rename_activated(GtkMenuItem *menuitem, gpointer user_data);
 static void on_remove_activated(GtkMenuItem *menuitem, gpointer user_data);
 static void on_add_current_file_to_project_activated(GtkMenuItem *menuitem, gpointer user_data);
 static void on_add_all_open_files_to_project_activated(GtkMenuItem *menuitem, gpointer user_data);
@@ -60,19 +62,7 @@ static GtkWidget *create_context_menu(void)
     GtkWidget *menu = gtk_menu_new();
     GtkWidget *item;
 
-    // Add/Remove Group
-    item = gtk_menu_item_new_with_label(_("New Group..."));
-    g_signal_connect(item, "activate", G_CALLBACK(on_new_group_activated), NULL);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
-
-    item = gtk_menu_item_new_with_label(_("Remove Highlighted Entry"));
-    g_signal_connect(item, "activate", G_CALLBACK(on_remove_activated), NULL);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
-
-    item = gtk_separator_menu_item_new();
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
-
-    // Add Files
+    // Add Files (Now at the top)
     item = gtk_menu_item_new_with_label(_("Add Current File to Project Tree"));
     g_signal_connect(item, "activate", G_CALLBACK(on_add_current_file_to_project_activated), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
@@ -84,17 +74,106 @@ static GtkWidget *create_context_menu(void)
     item = gtk_separator_menu_item_new();
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
+    // Group/Rename/Remove Actions
+    item = gtk_menu_item_new_with_label(_("New Group..."));
+    g_signal_connect(item, "activate", G_CALLBACK(on_new_group_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_menu_item_new_with_label(_("Rename Highlighted Entry..."));
+    g_signal_connect(item, "activate", G_CALLBACK(on_rename_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_menu_item_new_with_label(_("Remove Highlighted Entry"));
+    g_signal_connect(item, "activate", G_CALLBACK(on_remove_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
     // Save Actions
-    item = gtk_menu_item_new_with_label(_("Save Project Tree"));
+    item = gtk_menu_item_new_with_label(_("Save Project Tree .ini"));
     g_signal_connect(item, "activate", G_CALLBACK(on_save_project_tree_activated), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
-    item = gtk_menu_item_new_with_label(_("Save Session"));
+    item = gtk_menu_item_new_with_label(_("Save Session .ini"));
     g_signal_connect(item, "activate", G_CALLBACK(on_save_session_activated), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     gtk_widget_show_all(menu);
     return menu;
+}
+
+static GtkWidget *create_tree_menu(void)
+{
+    GtkWidget *menu = gtk_menu_new();
+    GtkWidget *item;
+
+    // Add Files (Now at the top)
+    item = gtk_menu_item_new_with_label(_("Add Current File to Project Tree"));
+    g_signal_connect(item, "activate", G_CALLBACK(on_add_current_file_to_project_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_menu_item_new_with_label(_("Add All Open Files to Project Tree"));
+    g_signal_connect(item, "activate", G_CALLBACK(on_add_all_open_files_to_project_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    // Group/Rename/Remove Actions
+    item = gtk_menu_item_new_with_label(_("New Group..."));
+    g_signal_connect(item, "activate", G_CALLBACK(on_new_group_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_menu_item_new_with_label(_("Rename Highlighted Entry..."));
+    g_signal_connect(item, "activate", G_CALLBACK(on_rename_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_menu_item_new_with_label(_("Remove Highlighted Entry"));
+    g_signal_connect(item, "activate", G_CALLBACK(on_remove_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    // Save Actions
+    item = gtk_menu_item_new_with_label(_("Save Project Tree .ini"));
+    g_signal_connect(item, "activate", G_CALLBACK(on_save_project_tree_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_menu_item_new_with_label(_("Save Session .ini"));
+    g_signal_connect(item, "activate", G_CALLBACK(on_save_session_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    gtk_widget_show_all(menu);
+    return menu;
+}
+
+static GtkWidget *create_save_menubar(void)
+{
+    GtkWidget *menubar = gtk_menu_bar_new();
+    GtkWidget *tree_item = gtk_menu_item_new_with_label(_("Tree"));
+    GtkWidget *tree_menu = create_tree_menu();
+
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(tree_item), tree_menu);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), tree_item);
+
+    GtkWidget *save_item = gtk_menu_item_new_with_label(_("Save"));
+    GtkWidget *save_menu = gtk_menu_new();
+
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(save_item), save_menu);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menubar), save_item);
+
+    GtkWidget *item_layout = gtk_menu_item_new_with_label(_("Save Project Tree .ini"));
+    g_signal_connect(item_layout, "activate", G_CALLBACK(on_save_project_tree_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(save_menu), item_layout);
+
+    GtkWidget *item_session = gtk_menu_item_new_with_label(_("Save Session .ini"));
+    g_signal_connect(item_session, "activate", G_CALLBACK(on_save_session_activated), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(save_menu), item_session);
+
+    gtk_widget_show_all(menubar);
+    return menubar;
 }
 
 
@@ -300,8 +379,7 @@ static void on_tree_view_drag_data_received(GtkWidget *widget, GdkDragContext *c
             dragged_node->parent = NULL;
         }
         
-        project_tree_save(current_project_tree);
-        sidebar_refresh();
+        sidebar_sync_and_refresh();
     }
     gtk_drag_finish(context, TRUE, TRUE, time);
 }
@@ -435,56 +513,105 @@ static void restore_expansion_state_recursive(GtkTreeModel *model, GtkTreeIter *
     }
 }
 
+void sidebar_update_colors(void)
+{
+    if (!project_tree_view || !sync_editor_colors)
+        return;
+
+    // Apply dynamic Color Sync styling
+    static GtkCssProvider *provider = NULL;
+    static gboolean provider_added = FALSE;
+    GtkStyleContext *context = gtk_widget_get_style_context(project_tree_view);
+    
+    GeanyDocument *doc = document_get_current();
+    if (!doc) doc = document_get_from_page(0); // Fallback to first tab if none active
+
+    if (doc && doc->editor && doc->editor->sci)
+    {
+        // Scintilla colors are 0xBBGGRR
+        long bg = scintilla_send_message(doc->editor->sci, SCI_STYLEGETBACK, STYLE_DEFAULT, 0);
+        long fg = scintilla_send_message(doc->editor->sci, SCI_STYLEGETFORE, STYLE_DEFAULT, 0);
+        
+        gchar *css = g_strdup_printf(
+            "#project_tree_view { background-color: #%02x%02x%02x; color: #%02x%02x%02x; }\n"
+            "#project_tree_view:selected { background-color: #4a90d9; color: #ffffff; }",
+            (int)(bg & 0xff), (int)((bg >> 8) & 0xff), (int)((bg >> 16) & 0xff),
+            (int)(fg & 0xff), (int)((fg >> 8) & 0xff), (int)((fg >> 16) & 0xff));
+
+        if (!provider)
+            provider = gtk_css_provider_new();
+        
+        gtk_css_provider_load_from_data(provider, css, -1, NULL);
+        g_free(css);
+
+        if (!provider_added)
+        {
+            gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
+            gtk_widget_set_name(project_tree_view, "project_tree_view");
+            provider_added = TRUE;
+        }
+    }
+}
+
+// Helper to find an iter by its node pointer
+static gboolean find_iter_by_node(GtkTreeModel *model, GtkTreeIter *parent, ProjectTreeNode *target_node, GtkTreeIter *result)
+{
+    GtkTreeIter iter;
+    gboolean valid = gtk_tree_model_iter_children(model, &iter, parent);
+
+    while (valid)
+    {
+        ProjectTreeNode *node;
+        gtk_tree_model_get(model, &iter, PROJECT_TREE_COLUMN_NODE_PTR, &node, -1);
+        if (node == target_node)
+        {
+            *result = iter;
+            return TRUE;
+        }
+        
+        // Recurse into children
+        if (find_iter_by_node(model, &iter, target_node, result))
+            return TRUE;
+            
+        valid = gtk_tree_model_iter_next(model, &iter);
+    }
+    return FALSE;
+}
+
+void sidebar_sync_ui_state(void)
+{
+    if (!project_tree_view || !project_tree_store || !current_project_tree)
+        return;
+
+    // Preserve expansion state from UI
+    GSList *new_open = sidebar_get_open_groups();
+    if (new_open) 
+    {
+        g_slist_free_full(current_project_tree->open_groups, g_free);
+        current_project_tree->open_groups = new_open;
+    }
+
+    // Capture selection
+    ProjectTreeNode *selected_node = NULL;
+    GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(project_tree_view));
+    GtkTreeIter sel_iter;
+    if (gtk_tree_selection_get_selected(selection, NULL, &sel_iter))
+    {
+        gtk_tree_model_get(GTK_TREE_MODEL(project_tree_store), &sel_iter, PROJECT_TREE_COLUMN_NODE_PTR, &selected_node, -1);
+    }
+    
+    // Store temporarily in the tree view object so refresh can find it
+    g_object_set_data(G_OBJECT(project_tree_view), "last-selected-node", selected_node);
+}
+
 void sidebar_refresh(void)
 {
     if (!project_tree_view_vbox || !project_tree_store)
         return;
 
-    // Apply or remove dynamic Color Sync styling
-    static GtkCssProvider *provider = NULL;
-    static gboolean provider_added = FALSE;
-    GtkStyleContext *context = gtk_widget_get_style_context(project_tree_view);
-    
-    if (sync_editor_colors)
-    {
-        GeanyDocument *doc = document_get_current();
-        if (!doc) doc = document_get_from_page(0); // Fallback to first tab if none active
+    sidebar_update_colors();
 
-        if (doc && doc->editor && doc->editor->sci)
-        {
-            // Scintilla colors are 0xBBGGRR
-            long bg = scintilla_send_message(doc->editor->sci, SCI_STYLEGETBACK, STYLE_DEFAULT, 0);
-            long fg = scintilla_send_message(doc->editor->sci, SCI_STYLEGETFORE, STYLE_DEFAULT, 0);
-            
-            gchar *css = g_strdup_printf(
-                "#project_tree_view { background-color: #%02x%02x%02x; color: #%02x%02x%02x; }\n"
-                "#project_tree_view:selected { background-color: #4a90d9; color: #ffffff; }",
-                (int)(bg & 0xff), (int)((bg >> 8) & 0xff), (int)((bg >> 16) & 0xff),
-                (int)(fg & 0xff), (int)((fg >> 8) & 0xff), (int)((fg >> 16) & 0xff));
-
-            // g_message("Syncing colors: BG=#%02x%02x%02x, FG=#%02x%02x%02x", 
-            //           (int)(bg & 0xff), (int)((bg >> 8) & 0xff), (int)((bg >> 16) & 0xff),
-            //           (int)(fg & 0xff), (int)((fg >> 8) & 0xff), (int)((fg >> 16) & 0xff));
-
-            if (!provider)
-                provider = gtk_css_provider_new();
-            
-            gtk_css_provider_load_from_data(provider, css, -1, NULL);
-            g_free(css);
-
-            if (!provider_added)
-            {
-                gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
-                gtk_widget_set_name(project_tree_view, "project_tree_view");
-                provider_added = TRUE;
-            }
-        }
-    }
-    else if (provider_added)
-    {
-        gtk_style_context_remove_provider(context, GTK_STYLE_PROVIDER(provider));
-        provider_added = FALSE;
-    }
+    ProjectTreeNode *selected_node = g_object_get_data(G_OBJECT(project_tree_view), "last-selected-node");
 
     gtk_tree_store_clear(project_tree_store);
 
@@ -500,6 +627,23 @@ void sidebar_refresh(void)
 
     // Apply expansion state top-down
     restore_expansion_state_recursive(GTK_TREE_MODEL(project_tree_store), NULL);
+
+    // Restore selection
+    if (selected_node)
+    {
+        GtkTreeIter new_sel_iter;
+        if (find_iter_by_node(GTK_TREE_MODEL(project_tree_store), NULL, selected_node, &new_sel_iter))
+        {
+            GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(project_tree_view));
+            gtk_tree_selection_select_iter(selection, &new_sel_iter);
+        }
+    }
+}
+
+void sidebar_sync_and_refresh(void)
+{
+    sidebar_sync_ui_state();
+    sidebar_refresh();
 }
 
 void create_sidebar(void)
@@ -507,6 +651,10 @@ void create_sidebar(void)
     GtkWidget *scrollwin;
 
     project_tree_view_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    
+    GtkWidget *menubar = create_save_menubar();
+    gtk_box_pack_start(GTK_BOX(project_tree_view_vbox), menubar, FALSE, FALSE, 0);
+
     project_tree_view = gtk_tree_view_new();
     prepare_project_tree_view();
 
@@ -568,7 +716,7 @@ GSList *sidebar_get_open_groups(void)
     if (!project_tree_view || !project_tree_store) return NULL;
 
     get_expanded_paths_recursive(GTK_TREE_VIEW(project_tree_view), GTK_TREE_MODEL(project_tree_store), NULL, &list);
-    return list;
+    return g_slist_reverse(list);
 }
 
 // Callback for "New Group..." menu item
@@ -602,7 +750,7 @@ static void on_new_group_activated(GtkMenuItem *menuitem, gpointer user_data)
         {
             project_tree_add_node(current_project_tree, NULL, new_group_node);
         }
-        sidebar_refresh();
+        sidebar_sync_and_refresh();
     }
     g_free(group_name);
 }
@@ -634,13 +782,22 @@ static void on_remove_activated(GtkMenuItem *menuitem, gpointer user_data)
 
             if (node_to_remove)
             {
-                gchar *confirm_msg = g_strdup_printf(_("Are you sure you want to remove '%s'%s?"),
-                                                      node_name, node_to_remove->is_group ? _(" and its contents") : "");
+                gchar *confirm_msg;
+                if (node_to_remove->is_group)
+                {
+                    confirm_msg = g_strdup_printf(_("Are you sure you want to remove the group '%s' and its contents from the Project Tree?"),
+                                                  node_to_remove->name);
+                }
+                else
+                {
+                    confirm_msg = g_strdup_printf(_("Are you sure you want to remove '%s' from the Project Tree?"),
+                                                  node_to_remove->path ? node_to_remove->path : node_to_remove->name);
+                }
+
                 if (dialogs_show_question(confirm_msg))
                 {
                     project_tree_remove_node(current_project_tree, node_to_remove);
-                    project_tree_save(current_project_tree);
-                    sidebar_refresh();
+                    sidebar_sync_and_refresh();
                 }
                 g_free(confirm_msg);
             }
@@ -744,33 +901,61 @@ static void on_save_project_tree_activated(GtkMenuItem *menuitem, gpointer user_
 }
 
 // Callback for "Save Session" menu item
-
 static void on_save_session_activated(GtkMenuItem *menuitem, gpointer user_data)
-
 {
-
     gchar *message;
+    if (!current_project_tree) return;
+
+    // Update open groups list from UI state
+    g_slist_foreach(current_project_tree->open_groups, (GFunc)g_free, NULL);
+    g_slist_free(current_project_tree->open_groups);
+    current_project_tree->open_groups = sidebar_get_open_groups();
+
+    project_tree_save_session(current_project_tree);
+    message = g_strdup_printf(_("Session saved to '%s'"), current_project_tree->session_file_path);
+    dialogs_show_msgbox(GTK_MESSAGE_INFO, message);
+    g_free(message);
+}
+
+// Callback for "Rename Highlighted Entry" menu item
+static void on_rename_activated(GtkMenuItem *menuitem, gpointer user_data)
+{
+    GtkTreeSelection *selection;
+    GtkTreeModel *model;
+    GtkTreeIter iter;
 
     if (!current_project_tree) return;
 
+    selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(project_tree_view));
+    if (gtk_tree_selection_get_selected(selection, &model, &iter))
+    {
+        ProjectTreeNode *node = NULL;
+        gtk_tree_model_get(model, &iter, PROJECT_TREE_COLUMN_NODE_PTR, &node, -1);
 
+        if (node)
+        {
+            gchar *new_name = dialogs_show_input(_("Rename Entry"), 
+                                                 GTK_WINDOW(geany->main_widgets->window), 
+                                                 _("Enter new name:"), 
+                                                 node->name);
+            if (new_name && new_name[0] != '\0' && strcmp(new_name, node->name) != 0)
+            {
+                if (!node->is_group && node->path)
+                {
+                    // Update path to point to the new name in the same directory
+                    gchar *dir = g_path_get_dirname(node->path);
+                    gchar *new_path = g_build_filename(dir, new_name, NULL);
+                    g_free(node->path);
+                    node->path = new_path;
+                    g_free(dir);
+                }
 
-    // Update open groups list from UI state
-
-    g_slist_foreach(current_project_tree->open_groups, (GFunc)g_free, NULL);
-
-    g_slist_free(current_project_tree->open_groups);
-
-    current_project_tree->open_groups = sidebar_get_open_groups();
-
-
-
-    project_tree_save_session(current_project_tree);
-
-    message = g_strdup_printf(_("Session saved to '%s'"), current_project_tree->session_file_path);
-
-    dialogs_show_msgbox(GTK_MESSAGE_INFO, message);
-
-    g_free(message);
-
+                g_free(node->name);
+                node->name = g_strdup(new_name);
+                
+                sidebar_sync_and_refresh();
+            }
+            g_free(new_name);
+        }
+    }
 }

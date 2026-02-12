@@ -63,7 +63,7 @@ ProjectTreeNode *add_file_to_project(const gchar *file_path, ProjectTreeNode *pa
     ProjectTreeNode *new_file_node = project_tree_node_new(g_path_get_basename(file_path), file_path, FALSE);
     ProjectTreeNode *ret = project_tree_add_node(current_project_tree, parent_node, new_file_node);
     
-    sidebar_refresh();
+    sidebar_sync_and_refresh();
     return ret;
 }
 
@@ -75,7 +75,7 @@ ProjectTreeNode *insert_file_to_project_after(const gchar *file_path, ProjectTre
     ProjectTreeNode *new_file_node = project_tree_node_new(g_path_get_basename(file_path), file_path, FALSE);
     ProjectTreeNode *ret = project_tree_insert_node_after(current_project_tree, after_node, new_file_node);
     
-    sidebar_refresh();
+    sidebar_sync_and_refresh();
     return ret;
 }
 
@@ -87,11 +87,10 @@ static gboolean on_idle_refresh(gpointer user_data)
 
 static void on_editor_notify(GObject *obj, GeanyEditor *editor, SCNotification *nt, gpointer user_data)
 {
-    // Refresh sidebar colors if sync is enabled
-    // We don't filter for specific notifications here to catch general style updates
+    // Update colors only to avoid destroying tree state on every notification
     if (sync_editor_colors)
     {
-        sidebar_refresh();
+        sidebar_update_colors();
     }
 }
 
@@ -118,6 +117,25 @@ void plugin_init(GeanyData *data)
         create_sidebar();
         // Add idle refresh to ensure expansion works after UI is ready
         g_idle_add(on_idle_refresh, NULL);
+    }
+
+    // Add items to Geany's Project menu
+    GtkWidget *project_menu = geany_data->main_widgets->project_menu;
+    if (project_menu)
+    {
+        GtkWidget *separator = gtk_separator_menu_item_new();
+        gtk_menu_shell_append(GTK_MENU_SHELL(project_menu), separator);
+        gtk_widget_show(separator);
+
+        GtkWidget *item_add_curr = gtk_menu_item_new_with_label(_("Add Current File to Project Tree"));
+        g_signal_connect(item_add_curr, "activate", G_CALLBACK(on_add_current_file_to_project), NULL);
+        gtk_menu_shell_append(GTK_MENU_SHELL(project_menu), item_add_curr);
+        gtk_widget_show(item_add_curr);
+
+        GtkWidget *item_add_all = gtk_menu_item_new_with_label(_("Add All Open Files to Project Tree"));
+        g_signal_connect(item_add_all, "activate", G_CALLBACK(on_add_all_open_files_to_project), NULL);
+        gtk_menu_shell_append(GTK_MENU_SHELL(project_menu), item_add_all);
+        gtk_widget_show(item_add_all);
     }
 
     // Connect to editor-notify to catch color scheme changes immediately
