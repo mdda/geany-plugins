@@ -699,10 +699,13 @@ static void get_expanded_paths_recursive(GtkTreeView *tree_view, GtkTreeModel *m
                 if (node && node->is_group)
                 {
                     gchar *full_path = get_node_tree_path(node);
-                    *list = g_slist_prepend(*list, full_path);
-                    
-                    // Recurse into children
-                    get_expanded_paths_recursive(tree_view, model, &child_iter, list);
+                    if (full_path)
+                    {
+                        *list = g_slist_prepend(*list, full_path);
+                        
+                        // Recurse into children
+                        get_expanded_paths_recursive(tree_view, model, &child_iter, list);
+                    }
                 }
             }
             gtk_tree_path_free(path);
@@ -796,8 +799,9 @@ static void on_remove_activated(GtkMenuItem *menuitem, gpointer user_data)
 
                 if (dialogs_show_question(confirm_msg))
                 {
+                    sidebar_sync_ui_state(); // Capture state (expansion, selection) BEFORE freeing node
                     project_tree_remove_node(current_project_tree, node_to_remove);
-                    sidebar_sync_and_refresh();
+                    sidebar_refresh(); // Just refresh, don't sync again as it would try to traverse deleted node
                 }
                 g_free(confirm_msg);
             }
