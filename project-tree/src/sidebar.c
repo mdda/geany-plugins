@@ -50,8 +50,6 @@ static void on_tree_view_drag_data_received(GtkWidget *widget, GdkDragContext *c
 static void on_new_group_activated(GtkMenuItem *menuitem, gpointer user_data);
 static void on_rename_activated(GtkMenuItem *menuitem, gpointer user_data);
 static void on_remove_activated(GtkMenuItem *menuitem, gpointer user_data);
-static void on_add_current_file_to_project_activated(GtkMenuItem *menuitem, gpointer user_data);
-static void on_add_all_open_files_to_project_activated(GtkMenuItem *menuitem, gpointer user_data);
 static void on_save_project_tree_activated(GtkMenuItem *menuitem, gpointer user_data);
 static void on_save_session_activated(GtkMenuItem *menuitem, gpointer user_data);
 
@@ -64,11 +62,11 @@ static GtkWidget *create_context_menu(void)
 
     // Add Files (Now at the top)
     item = gtk_menu_item_new_with_label(_("Add Current File to Project Tree"));
-    g_signal_connect(item, "activate", G_CALLBACK(on_add_current_file_to_project_activated), NULL);
+    g_signal_connect(item, "activate", G_CALLBACK(on_add_current_file_to_project), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     item = gtk_menu_item_new_with_label(_("Add All Open Files to Project Tree"));
-    g_signal_connect(item, "activate", G_CALLBACK(on_add_all_open_files_to_project_activated), NULL);
+    g_signal_connect(item, "activate", G_CALLBACK(on_add_all_open_files_to_project), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     item = gtk_separator_menu_item_new();
@@ -110,11 +108,11 @@ static GtkWidget *create_tree_menu(void)
 
     // Add Files (Now at the top)
     item = gtk_menu_item_new_with_label(_("Add Current File to Project Tree"));
-    g_signal_connect(item, "activate", G_CALLBACK(on_add_current_file_to_project_activated), NULL);
+    g_signal_connect(item, "activate", G_CALLBACK(on_add_current_file_to_project), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     item = gtk_menu_item_new_with_label(_("Add All Open Files to Project Tree"));
-    g_signal_connect(item, "activate", G_CALLBACK(on_add_all_open_files_to_project_activated), NULL);
+    g_signal_connect(item, "activate", G_CALLBACK(on_add_all_open_files_to_project), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     item = gtk_separator_menu_item_new();
@@ -515,7 +513,7 @@ static void restore_expansion_state_recursive(GtkTreeModel *model, GtkTreeIter *
 
 void sidebar_update_colors(void)
 {
-    if (!project_tree_view || !sync_editor_colors)
+    if (!project_tree_view || !pt_config || !pt_config->sync_editor_colors)
         return;
 
     // Apply dynamic Color Sync styling
@@ -809,86 +807,6 @@ static void on_remove_activated(GtkMenuItem *menuitem, gpointer user_data)
         }
         g_list_foreach(selected_rows, (GFunc)gtk_tree_path_free, NULL);
         g_list_free(selected_rows);
-    }
-}
-
-// Callback for "Add Current File to Project Tree" menu item
-static void on_add_current_file_to_project_activated(GtkMenuItem *menuitem, gpointer user_data)
-{
-    GeanyDocument *doc;
-    if (!current_project_tree) return;
-
-    doc = document_get_current();
-    if (doc && doc->file_name)
-    {
-        GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(project_tree_view));
-        GtkTreeModel *model;
-        GtkTreeIter iter;
-
-        if (gtk_tree_selection_get_selected(selection, &model, &iter))
-        {
-            ProjectTreeNode *selected_node = NULL;
-            gtk_tree_model_get(model, &iter, PROJECT_TREE_COLUMN_NODE_PTR, &selected_node, -1);
-            if (selected_node)
-            {
-                if (selected_node->is_group)
-                    add_file_to_project(doc->file_name, selected_node);
-                else
-                    insert_file_to_project_after(doc->file_name, selected_node);
-            }
-        }
-        else
-        {
-            add_file_to_project(doc->file_name, NULL);
-        }
-    }
-    else
-    {
-        dialogs_show_msgbox(GTK_MESSAGE_INFO, _("No current file to add to project."));
-    }
-}
-
-// Callback for "Add All Open Files to Project Tree" menu item
-static void on_add_all_open_files_to_project_activated(GtkMenuItem *menuitem, gpointer user_data)
-{
-    guint page_num = 0;
-    GtkTreeSelection *selection;
-    GtkTreeModel *model;
-    GtkTreeIter iter;
-    ProjectTreeNode *selected_node = NULL;
-    GeanyDocument *doc = NULL;
-    ProjectTreeNode *last_added;
-
-    if (!current_project_tree) return;
-
-    selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(project_tree_view));
-    
-    if (gtk_tree_selection_get_selected(selection, &model, &iter))
-        gtk_tree_model_get(model, &iter, PROJECT_TREE_COLUMN_NODE_PTR, &selected_node, -1);
-
-    last_added = selected_node;
-
-    while ((doc = document_get_from_page(page_num)) != NULL)
-    {
-        if (doc && doc->file_name)
-        {
-            if (last_added)
-            {
-                if (last_added->is_group)
-                {
-                    last_added = add_file_to_project(doc->file_name, last_added);
-                }
-                else
-                {
-                    last_added = insert_file_to_project_after(doc->file_name, last_added);
-                }
-            }
-            else
-            {
-                last_added = add_file_to_project(doc->file_name, NULL);
-            }
-        }
-        page_num++;
     }
 }
 

@@ -54,15 +54,17 @@ void sidebar_sync_and_refresh(void);
 void sidebar_update_colors(void);
 
 // Getter for the GtkTreeView widget
+
 GtkTreeView *get_project_tree_view(void);
 
+
+
 // Get list of open (expanded) groups
+
 GSList *sidebar_get_open_groups(void);
 
-// Prototypes for functions used in sidebar.c (Geany API functions)
-void document_goto_line(GeanyDocument *doc, gint line, gboolean center_line);
-gchar* dialogs_show_input (const gchar *title, GtkWindow *parent, const gchar *message, const gchar *default_value);
-gboolean dialogs_show_question (const gchar *message, ...) G_GNUC_PRINTF (1, 2);
+
+
 
 
 #endif /* __PROJECT_TREE_SIDEBAR_H__ */

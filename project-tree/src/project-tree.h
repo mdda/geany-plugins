@@ -22,10 +22,17 @@
 #include <geanyplugin.h>
 #include "project.h" // For ProjectTreeNode definition
 
+// Configuration structure
+typedef struct
+{
+    gboolean display_sidebar;
+    gboolean sync_editor_colors;
+} ProjectTreeConfig;
+
 // Global plugin variables
 extern GeanyPlugin *geany_plugin;
 extern GeanyData *geany_data;
-extern gboolean sync_editor_colors;
+extern ProjectTreeConfig *pt_config;
 
 // Keybinding enum for new actions
 enum
@@ -34,11 +41,6 @@ enum
     PT_KEYBIND_ADD_ALL_OPEN_FILES,
     PT_KEYBIND_COUNT
 };
-
-// Function declarations for plugin lifecycle
-void plugin_init(GeanyData *data);
-void plugin_cleanup(void);
-GtkWidget *plugin_configure(GtkDialog *dialog);
 
 // Forward declarations for functions used across files
 ProjectTreeNode *add_file_to_project(const gchar *file_path, ProjectTreeNode *parent_node);
