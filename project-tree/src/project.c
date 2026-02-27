@@ -510,153 +510,358 @@ static void save_section_recursive(GKeyFile *key_file, GSList *nodes, const gcha
     }
 }
 
-void project_tree_save(ProjectTree *tree)
+gint project_tree_save(ProjectTree *tree)
+
 {
-    if (!tree || !tree->project_file_path) return;
+
+    if (!tree || !tree->project_file_path) return SAVE_RESULT_FAILED;
+
+
+
+    gboolean file_exists = g_file_test(tree->project_file_path, G_FILE_TEST_EXISTS);
+
+    gint result = SAVE_RESULT_SAVED;
+
+
 
     // repo root is parent of .editor (where project_file_path is)
+
     gchar *dot_editor_dir = g_path_get_dirname(tree->project_file_path);
+
     gchar *repo_root = g_path_get_dirname(dot_editor_dir);
 
+
+
     GKeyFile *key_file = g_key_file_new();
+
     save_section_recursive(key_file, tree->root_nodes, ".", repo_root);
 
+
+
     gsize data_len;
+
     GError *error = NULL;
+
     gchar *data = g_key_file_to_data(key_file, &data_len, &error);
+
     
+
     if (!error)
+
     {
+
         // Unconditionally append a newline as requested
+
         gchar *new_data = g_strconcat(data, "\n", NULL);
+
         g_free(data);
+
         data = new_data;
+
         data_len = strlen(data);
 
+
+
         if (!g_file_test(dot_editor_dir, G_FILE_TEST_IS_DIR))
+
         {
+
             gchar *confirm_msg = g_strdup_printf(_("The directory '%s' does not exist. Create it?"), dot_editor_dir);
+
             gboolean create_dir = dialogs_show_question(confirm_msg);
+
             g_free(confirm_msg);
 
+
+
             if (create_dir)
+
             {
+
                 if (g_mkdir_with_parents(dot_editor_dir, 0755) != 0)
+
                 {
+
                     g_warning("Failed to create directory '%s'", dot_editor_dir);
-                    g_free(dot_editor_dir); g_free(repo_root); g_free(data); g_key_file_free(key_file); return;
+
+                    g_free(dot_editor_dir); g_free(repo_root); g_free(data); g_key_file_free(key_file); 
+
+                    return SAVE_RESULT_FAILED;
+
                 }
+
             }
+
             else
+
             {
-                g_free(dot_editor_dir); g_free(repo_root); g_free(data); g_key_file_free(key_file); return;
+
+                g_free(dot_editor_dir); g_free(repo_root); g_free(data); g_key_file_free(key_file); 
+
+                return SAVE_RESULT_FAILED;
+
             }
+
         }
+
+
 
         if (!g_file_set_contents(tree->project_file_path, data, data_len, &error))
+
         {
+
             if (error) { g_warning("Save failed: %s", error->message); g_error_free(error); }
+
+            result = SAVE_RESULT_FAILED;
+
         }
+
+        else if (!file_exists)
+
+        {
+
+            result = SAVE_RESULT_CREATED;
+
+        }
+
     }
-    else { g_error_free(error); }
+
+    else 
+
+    { 
+
+        g_error_free(error); 
+
+        result = SAVE_RESULT_FAILED;
+
+    }
+
+
 
     g_free(dot_editor_dir);
+
     g_free(repo_root);
+
     g_free(data);
+
     g_key_file_free(key_file);
+
+    return result;
+
 }
 
-void project_tree_save_session(ProjectTree *tree)
+
+
+gint project_tree_save_session(ProjectTree *tree)
+
 {
-    if (!tree || !tree->session_file_path) return;
+
+    if (!tree || !tree->session_file_path) return SAVE_RESULT_FAILED;
+
+
+
+    gboolean file_exists = g_file_test(tree->session_file_path, G_FILE_TEST_EXISTS);
+
+    gint result = SAVE_RESULT_SAVED;
+
+
 
     gchar *dot_editor_dir = g_path_get_dirname(tree->session_file_path);
+
     gchar *repo_root = g_path_get_dirname(dot_editor_dir);
 
+
+
     GKeyFile *key_file = g_key_file_new();
+
     
+
     // Save Open Files
+
     gint open_file_idx = 10;
+
     guint page_num = 0;
+
     GeanyDocument *doc = NULL;
+
     while ((doc = document_get_from_page(page_num)) != NULL)
+
     {
+
         if (doc && doc->file_name)
+
         {
+
             gchar *key = g_strdup_printf("%d", open_file_idx);
+
             gchar *rel_path = get_relative_path_for_save(doc->file_name, repo_root);
+
             
+
             gint line = 1;
+
             if (doc->editor && doc->editor->sci)
+
                 line = sci_get_current_line(doc->editor->sci) + 1;
 
+
+
             GString *val = g_string_new(rel_path);
+
             g_string_append_printf(val, ":%d", line);
+
             
+
             if (doc->readonly)
+
                 g_string_append(val, ":readonly");
 
+
+
             g_key_file_set_string(key_file, "open-files", key, val->str);
+
             
+
             g_free(key);
+
             g_string_free(val, TRUE);
+
             g_free(rel_path);
+
             open_file_idx += 10;
+
         }
+
         page_num++;
+
     }
+
+
 
     GeanyDocument *curr_doc = document_get_current();
+
     if (curr_doc && curr_doc->file_name)
+
     {
+
         gchar *rel_path = get_relative_path_for_save(curr_doc->file_name, repo_root);
+
         g_key_file_set_string(key_file, "open-files", "current_file", rel_path);
+
         g_free(rel_path);
+
     }
+
+
 
     // Save Open Groups (Tree State)
+
     if (tree->open_groups)
+
     {
+
         gint group_idx = 10;
+
         GSList *l;
+
         for (l = tree->open_groups; l != NULL; l = g_slist_next(l))
+
         {
+
             gchar *key = g_strdup_printf("%d", group_idx);
+
             g_key_file_set_string(key_file, "open-tree", key, (gchar *)l->data);
+
             g_free(key);
+
             group_idx += 10;
+
         }
+
     }
+
+
 
     gsize data_len;
+
     GError *error = NULL;
+
     gchar *data = g_key_file_to_data(key_file, &data_len, &error);
 
+
+
     if (!error)
+
     {
+
         // Unconditionally append a newline as requested
+
         gchar *new_data = g_strconcat(data, "\n", NULL);
+
         g_free(data);
+
         data = new_data;
+
         data_len = strlen(data);
 
+
+
         if (!g_file_test(dot_editor_dir, G_FILE_TEST_IS_DIR))
+
         {
+
              if (g_mkdir_with_parents(dot_editor_dir, 0755) != 0)
+
              {
+
                  g_warning("Failed to create directory '%s'", dot_editor_dir);
+
              }
+
         }
+
+
 
         if (!g_file_set_contents(tree->session_file_path, data, data_len, &error))
+
         {
+
             if (error) { g_warning("Save failed: %s", error->message); g_error_free(error); }
+
+            result = SAVE_RESULT_FAILED;
+
         }
+
+        else if (!file_exists)
+
+        {
+
+            result = SAVE_RESULT_CREATED;
+
+        }
+
     }
-    else { g_error_free(error); }
+
+    else 
+
+    { 
+
+        g_error_free(error); 
+
+        result = SAVE_RESULT_FAILED;
+
+    }
+
+
 
     g_free(dot_editor_dir);
+
     g_free(repo_root);
+
     g_free(data);
+
     g_key_file_free(key_file);
+
+    return result;
+
 }

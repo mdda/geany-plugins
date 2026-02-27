@@ -891,19 +891,26 @@ static void on_add_all_open_files_to_project_activated(GtkMenuItem *menuitem, gp
 // Callback for "Save Project Tree" menu item
 static void on_save_project_tree_activated(GtkMenuItem *menuitem, gpointer user_data)
 {
-    gchar *message;
     if (!current_project_tree) return;
 
-    project_tree_save(current_project_tree);
-    message = g_strdup_printf(_("Project tree saved to '%s'"), current_project_tree->project_file_path);
-    dialogs_show_msgbox(GTK_MESSAGE_INFO, message);
-    g_free(message);
+    gint result = project_tree_save(current_project_tree);
+    if (result == SAVE_RESULT_CREATED)
+    {
+        ui_set_statusbar(TRUE, _("Project tree file created: %s"), current_project_tree->project_file_path);
+    }
+    else if (result == SAVE_RESULT_SAVED)
+    {
+        ui_set_statusbar(TRUE, _("Project tree saved."));
+    }
+    else
+    {
+        ui_set_statusbar(TRUE, _("Failed to save project tree."));
+    }
 }
 
 // Callback for "Save Session" menu item
 static void on_save_session_activated(GtkMenuItem *menuitem, gpointer user_data)
 {
-    gchar *message;
     if (!current_project_tree) return;
 
     // Update open groups list from UI state
@@ -911,10 +918,19 @@ static void on_save_session_activated(GtkMenuItem *menuitem, gpointer user_data)
     g_slist_free(current_project_tree->open_groups);
     current_project_tree->open_groups = sidebar_get_open_groups();
 
-    project_tree_save_session(current_project_tree);
-    message = g_strdup_printf(_("Session saved to '%s'"), current_project_tree->session_file_path);
-    dialogs_show_msgbox(GTK_MESSAGE_INFO, message);
-    g_free(message);
+    gint result = project_tree_save_session(current_project_tree);
+    if (result == SAVE_RESULT_CREATED)
+    {
+        ui_set_statusbar(TRUE, _("Session file created: %s"), current_project_tree->session_file_path);
+    }
+    else if (result == SAVE_RESULT_SAVED)
+    {
+        ui_set_statusbar(TRUE, _("Session saved."));
+    }
+    else
+    {
+        ui_set_statusbar(TRUE, _("Failed to save session."));
+    }
 }
 
 // Callback for "Rename Highlighted Entry" menu item

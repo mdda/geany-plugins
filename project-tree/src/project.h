@@ -53,8 +53,15 @@ void project_tree_free(ProjectTree *tree);
 
 // INI file parsing and writing
 ProjectTree *project_tree_load(const gchar *project_ini_path, const gchar *session_ini_path);
-void project_tree_save(ProjectTree *tree);
-void project_tree_save_session(ProjectTree *tree);
+
+typedef enum {
+    SAVE_RESULT_FAILED = 0,
+    SAVE_RESULT_SAVED,
+    SAVE_RESULT_CREATED
+} SaveResult;
+
+gint project_tree_save(ProjectTree *tree);
+gint project_tree_save_session(ProjectTree *tree);
 
 
 // Node management
